@@ -136,7 +136,7 @@ class BlobStorageHelper:
             ".dem",
         }
         ext = os.path.splitext(path)[-1].lower()
-        if ext not in self._vtk_extensions:
+        if ext not in _vtk_extensions:
             print("File extension not supported by PyVista.")
             return None
 
