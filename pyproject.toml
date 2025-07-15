@@ -1,9 +1,13 @@
 [project]
 name = "pyazure"
 version = "0.1.0"
-description = "Add your description here"
+description = "Some generic easy to use tools for Azure API calls"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "azure-storage-blob>=12.25.1",
 ]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
