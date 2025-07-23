@@ -196,4 +196,18 @@ class BlobStorageHelper:
             for blob in self.container_client.list_blobs(name_starts_with=prefix)
             if keyword in blob.name
         ]
+    def upload_local_file_to_blob(self, local_file_path: str, blob_file_path: str):
+        """
+        Uploads a file from the local filesystem to the specified blob path in the base container.
+        """
+        blob_client = self.base_container.get_blob_client(blob_file_path)
+        with open(local_file_path, "rb") as f:
+            blob_client.upload_blob(f, overwrite=True)
+            
+    def upload_base_file(self, file_data, blob_file_path):
+        """
+        Upload file data stream to blob storage
+        """
+        blob_client = self.base_container.get_blob_client(blob_file_path)
+        blob_client.upload_blob(file_data, overwrite=True)
 
