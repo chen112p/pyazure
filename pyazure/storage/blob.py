@@ -1,9 +1,10 @@
+
 import os
 import tempfile
 import time
 from io import BytesIO
 
-from azure.storage.blob import BlobPrefix, ContainerClient
+from azure.storage.blob import BlobPrefix, ContainerClient, generate_blob_sas, BlobSasPermissions
 
 
 class BlobStorageHelper:
@@ -16,17 +17,28 @@ class BlobStorageHelper:
         container_client (ContainerClient): The Azure Blob container client.
     """
 
-    def __init__(self, conn_str: str, container: str):
+    def __init__(
+        self,
+        conn_str: str | None = None,
+        container: str | None = None,
+        sas_url: str | None = None
+    ) -> None:
         """
-        Initialize the helper with a connection string and container name.
+        Initialize the helper with either a connection string and container name, or a SAS token URL.
 
         Args:
-            conn_str (str): Azure storage account connection string.
-            container (str): Name of the container to interact with.
+            conn_str (str, optional): Azure storage account connection string.
+            container (str, optional): Name of the container to interact with.
+            sas_url (str, optional): SAS token URL for the container.
         """
-        self.container_client = ContainerClient.from_connection_string(
-            conn_str, container_name=container
-        )
+        if sas_url:
+            self.container_client = ContainerClient.from_container_url(sas_url)
+        elif conn_str and container:
+            self.container_client = ContainerClient.from_connection_string(
+                conn_str, container_name=container
+            )
+        else:
+            raise ValueError("Must provide either sas_url or both conn_str and container.")
 
     def list_subdirectories(self, folder: str):
         """
@@ -47,7 +59,7 @@ class BlobStorageHelper:
             if isinstance(item, BlobPrefix)
         ]
 
-    def _get_blob_client(self, path: str):
+    def get_blob_client(self, path: str):
         """Return a blob client for the given blob path."""
         return self.container_client.get_blob_client(path)
 
@@ -62,7 +74,7 @@ class BlobStorageHelper:
         Returns:
             bytes or str or None: Blob content or None if failed or not found.
         """
-        blob = self._get_blob_client(path)
+        blob = self.get_blob_client(path)
         if blob.exists():
             try:
                 return (
@@ -85,7 +97,7 @@ class BlobStorageHelper:
         Returns:
             BytesIO or None: In-memory stream of blob content.
         """
-        blob = self._get_blob_client(path)
+        blob = self.get_blob_client(path)
         if blob.exists():
             stream = BytesIO()
             try:
@@ -141,12 +153,12 @@ class BlobStorageHelper:
             return None
 
         try:
-            import pyvista as pv
+            import pyvista as pv # type: ignore
         except ImportError:
             print("PyVista is not installed.")
             return None
 
-        blob = self._get_blob_client(path)
+        blob = self.get_blob_client(path)
         if blob.exists():
             try:
                 data = blob.download_blob().readall()
@@ -169,8 +181,8 @@ class BlobStorageHelper:
             source (str): Source blob path.
             target (str): Target blob path.
         """
-        source_blob = self._get_blob_client(source)
-        target_blob = self._get_blob_client(target)
+        source_blob = self.get_blob_client(source)
+        target_blob = self.get_blob_client(target)
 
         target_blob.start_copy_from_url(source_blob.url)
         while target_blob.get_blob_properties().copy.status == "pending":
@@ -196,18 +208,88 @@ class BlobStorageHelper:
             for blob in self.container_client.list_blobs(name_starts_with=prefix)
             if keyword in blob.name
         ]
+    
     def upload_local_file_to_blob(self, local_file_path: str, blob_file_path: str):
         """
-        Uploads a file from the local filesystem to the specified blob path in the base container.
+        Uploads a file from the local filesystem to the specified blob path in the container.
         """
-        blob_client = self.base_container.get_blob_client(blob_file_path)
+        blob_client = self.get_blob_client(blob_file_path)
         with open(local_file_path, "rb") as f:
             blob_client.upload_blob(f, overwrite=True)
             
-    def upload_base_file(self, file_data, blob_file_path):
+    def upload_stream_to_blob(self, file_data, blob_file_path):
         """
-        Upload file data stream to blob storage
+        Uploads a file-like object to the specified blob path in the base container.
         """
-        blob_client = self.base_container.get_blob_client(blob_file_path)
+        blob_client = self.get_blob_client(blob_file_path)
         blob_client.upload_blob(file_data, overwrite=True)
+        
+    def copy_blob_to_path(self, source_blob_client, target_blob_path):
+        """
+        Copies a blob to a new path in the container using a server-side copy.
+
+        Args:
+            source_blob_client: The BlobClient instance of the source blob.
+            target_blob_path (str): The destination path for the new blob.
+        """
+        target_blob_client = self.get_blob_client(target_blob_path)
+        target_blob_client.start_copy_from_url(source_blob_client.url)
+
+    def generate_blob_sas_token(self, blob_path, expiry_hours=24):
+        """
+        Generate a SAS token for a blob given its path in the container, only if the blob exists.
+
+        Args:
+            blob_path (str): Path of the blob in the container.
+            expiry_hours (int): Expiry time in hours.
+
+        Returns:
+            str: SAS token for the blob, or None if blob does not exist.
+        """
+        from datetime import datetime, timedelta
+
+        blob_client = self.get_blob_client(blob_path)
+        if not blob_client.exists():
+            print(f"Blob '{blob_path}' does not exist.")
+            return None
+        
+        if self.container_client.account_name is None or self.container_client.credential.account_key is None:
+            print("Account name or key is not set, cannot generate SAS token.")
+            return None
+
+        sas_token = generate_blob_sas(
+            account_name=self.container_client.account_name,
+            container_name=self.container_client.container_name,
+            blob_name=blob_path,
+            account_key=self.container_client.credential.account_key,
+            permission=BlobSasPermissions(read=True, write=True, delete=True),
+            expiry=datetime.utcnow() + timedelta(hours=expiry_hours),
+        )
+        return sas_token
+
+    def delete_blob(self, blob_path, force=False):
+        """
+        Delete a blob from the container, with optional confirmation prompt.
+
+        Args:
+            blob_path (str): Path of the blob in the container.
+            force (bool): If True, delete without prompt. If False, prompt user for confirmation. Default is False.
+
+        Returns:
+            bool: True if deleted, False if blob does not exist or user cancels.
+        """
+        blob_client = self.get_blob_client(blob_path)
+        if not blob_client.exists():
+            print(f"Blob '{blob_path}' does not exist.")
+            return False
+
+        if not force:
+            confirm = input(f"Are you sure you want to delete blob '{blob_path}'? (y/N): ").strip().lower()
+            if confirm != 'y':
+                print("Deletion cancelled.")
+                return False
+
+        blob_client.delete_blob()
+        print(f"Blob '{blob_path}' deleted.")
+        return True
 
