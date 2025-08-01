@@ -5,14 +5,14 @@ need to add more useful stuff
 
 # Install
 ## pip
-pip install git+ssh://git@github.com/chen112p/pyazure.git
+pip install git+http://git@github.com/chen112p/pyazure.git
 ## uv
-uv pip install git+ssh://git@github.com/chen112p/pyazure.git
+uv pip install git+http://git@github.com/chen112p/pyazure.git
 ### add to pyproject.toml
 ```
 dependencies = [
     ...
-    "pyazure @ git+ssh://git@github.com/chen112p/pyazure.git",
+    "pyazure @ git+http://git@github.com/chen112p/pyazure.git",
     ...
 ]
 ```
