@@ -32,8 +32,13 @@ class BlobStorageHelper:
             sas_url (str, optional): SAS token URL for the container.
         """
         if sas_url:
+            self.created_with_sas_token = True
+            self.sas_url = sas_url
             self.container_client = ContainerClient.from_container_url(sas_url)
         elif conn_str and container:
+            self.created_with_connection_string = True  # some functions can only work with container created with connection string
+            self.conn_str = conn_str
+            self.container_name = container
             self.container_client = ContainerClient.from_connection_string(
                 conn_str, container_name=container
             )
@@ -247,24 +252,32 @@ class BlobStorageHelper:
             str: SAS token for the blob, or None if blob does not exist.
         """
         from datetime import datetime, timedelta
+        if self.created_with_connection_string:
+            blob_client = self.get_blob_client(blob_path)
+            if not blob_client.exists():
+                print(f"Blob '{blob_path}' does not exist.")
+                return None
+            
+            if self.container_client.account_name is None or self.container_client.credential.account_key is None:
+                print("Account name or key is not set, cannot generate SAS token.")
+                return None
 
-        blob_client = self.get_blob_client(blob_path)
-        if not blob_client.exists():
-            print(f"Blob '{blob_path}' does not exist.")
+            sas_token = generate_blob_sas(
+                account_name=self.container_client.account_name,
+                container_name=self.container_client.container_name,
+                blob_name=blob_path,
+                account_key=self.container_client.credential.account_key,
+                permission=BlobSasPermissions(read=True, write=True, delete=True),
+                expiry=datetime.utcnow() + timedelta(hours=expiry_hours),
+            )
+        elif self.created_with_sas_token:
+            base_url, _, sas_token = self.sas_url.partition('?')
+            base_url = base_url.rstrip('/')
+            sas_token = f"{base_url}/{blob_path}?{sas_token}"
+        else:
+            print("Container was not created with a connection string or SAS token, cannot generate SAS token.")
             return None
         
-        if self.container_client.account_name is None or self.container_client.credential.account_key is None:
-            print("Account name or key is not set, cannot generate SAS token.")
-            return None
-
-        sas_token = generate_blob_sas(
-            account_name=self.container_client.account_name,
-            container_name=self.container_client.container_name,
-            blob_name=blob_path,
-            account_key=self.container_client.credential.account_key,
-            permission=BlobSasPermissions(read=True, write=True, delete=True),
-            expiry=datetime.utcnow() + timedelta(hours=expiry_hours),
-        )
         return sas_token
 
     def delete_blob(self, blob_path, force=False):
