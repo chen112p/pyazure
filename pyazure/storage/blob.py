@@ -31,6 +31,8 @@ class BlobStorageHelper:
             container (str, optional): Name of the container to interact with.
             sas_url (str, optional): SAS token URL for the container.
         """
+        self.created_with_connection_string = None
+        self.created_with_sas_token = None
         if sas_url:
             self.created_with_sas_token = True
             self.sas_url = sas_url
