@@ -346,7 +346,7 @@ class BlobStorageHelper:
             dir_name_no_slash = directory_path
 
         if len(list(container_client.list_blobs(name_starts_with=dir_prefix))) > 1:
-            self.clear_and_delete_directory(directory_path)
+            self.delete_directory(dir_prefix)
         
         # Delete the directory marker blob (if any)
         if verbose:
