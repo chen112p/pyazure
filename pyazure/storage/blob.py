@@ -242,7 +242,7 @@ class BlobStorageHelper:
         target_blob_client = self.get_blob_client(target_blob_path)
         target_blob_client.start_copy_from_url(source_blob_client.url)
 
-    def generate_blob_sas_token(self, blob_path, expiry_hours=24):
+    def generate_blob_sas_url(self, blob_path, expiry_hours=24):
         """
         Generate a SAS token for a blob given its path in the container, only if the blob exists.
 
@@ -251,7 +251,7 @@ class BlobStorageHelper:
             expiry_hours (int): Expiry time in hours.
 
         Returns:
-            str: SAS token for the blob, or None if blob does not exist.
+            str: SAS URL for the blob, or None if blob does not exist.
         """
         from datetime import datetime, timedelta
         if self.created_with_connection_string:
@@ -272,15 +272,16 @@ class BlobStorageHelper:
                 permission=BlobSasPermissions(read=True, write=True, delete=True),
                 expiry=datetime.utcnow() + timedelta(hours=expiry_hours),
             )
+            full_url = f"https://{self.container_client.account_name}.blob.core.windows.net/{self.container_client.container_name}/{blob_path}?{sas_token}"
         elif self.created_with_sas_token:
             base_url, _, sas_token = self.sas_url.partition('?')
             base_url = base_url.rstrip('/')
-            sas_token = f"{base_url}/{blob_path}?{sas_token}"
+            sas_url = f"{base_url}/{blob_path}?{sas_token}"
         else:
             print("Container was not created with a connection string or SAS token, cannot generate SAS token.")
             return None
-        
-        return sas_token
+
+        return sas_url
 
     def delete_blob(self, blob_path, force=False):
         """
