@@ -272,7 +272,7 @@ class BlobStorageHelper:
                 permission=BlobSasPermissions(read=True, write=True, delete=True),
                 expiry=datetime.utcnow() + timedelta(hours=expiry_hours),
             )
-            full_url = f"https://{self.container_client.account_name}.blob.core.windows.net/{self.container_client.container_name}/{blob_path}?{sas_token}"
+            sas_url = f"https://{self.container_client.account_name}.blob.core.windows.net/{self.container_client.container_name}/{blob_path}?{sas_token}"
         elif self.created_with_sas_token:
             base_url, _, sas_token = self.sas_url.partition('?')
             base_url = base_url.rstrip('/')
