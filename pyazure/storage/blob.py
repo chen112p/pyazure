@@ -309,3 +309,60 @@ class BlobStorageHelper:
         print(f"Blob '{blob_path}' deleted.")
         return True
 
+    def delete_directory(self, directory_path, verbose=False):
+        container_client = self.container_client
+
+        # Normalize path forms
+        if directory_path.endswith('/'):
+            dir_prefix = directory_path
+            dir_name_no_slash = directory_path.rstrip('/')
+        else:
+            dir_prefix = directory_path + '/'
+            dir_name_no_slash = directory_path
+
+        # Delete all blobs under the directory
+        if verbose:
+            print(f"Deleting all blobs under '{dir_prefix}'...")
+
+        for blob_ in container_client.list_blobs(name_starts_with=dir_prefix):
+            if len(list(container_client.list_blobs(name_starts_with=blob_.name))) > 1:
+                if verbose:
+                    print(f"Skipping non-empty directory: {blob_.name}")
+                continue
+            # delete real blobs and empty directories
+            try:
+                container_client.delete_blob(blob_.name)
+                if verbose:
+                    print(f"Deleted: {blob_.name}")
+            except Exception as e:
+                if verbose:
+                    print(f"Could not delete {blob_.name}: {e}")
+
+        if directory_path.endswith('/'):
+            dir_prefix = directory_path
+            dir_name_no_slash = directory_path.rstrip('/')
+        else:
+            dir_prefix = directory_path + '/'
+            dir_name_no_slash = directory_path
+
+        if len(list(container_client.list_blobs(name_starts_with=dir_prefix))) > 1:
+            self.clear_and_delete_directory(directory_path)
+        
+        # Delete the directory marker blob (if any)
+        if verbose:
+            print(f"Checking for directory marker for '{directory_path}'...")
+        marker_candidates = list(container_client.list_blobs(name_starts_with=dir_name_no_slash))
+        for blob in marker_candidates:
+            # The marker blob is usually the directory name itself, optionally with trailing slash
+            if blob.name.rstrip('/') == dir_name_no_slash:
+                try:
+                    container_client.delete_blob(blob.name)
+                    if verbose:
+                        print(f"Deleted directory marker: '{blob.name}'")
+                except Exception as e:
+                    if verbose:
+                        print(f"Could not delete directory marker {blob.name}: {e}")
+                break
+        else:
+            if verbose:
+                print(f"No directory marker found for: {directory_path}")
