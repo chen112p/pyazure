@@ -216,20 +216,20 @@ class BlobStorageHelper:
             if keyword in blob.name
         ]
     
-    def upload_local_file_to_blob(self, local_file_path: str, blob_file_path: str):
+    def upload_local_file_to_blob(self, local_file_path: str, blob_file_path: str, overwrite: bool = True):
         """
         Uploads a file from the local filesystem to the specified blob path in the container.
         """
         blob_client = self.get_blob_client(blob_file_path)
         with open(local_file_path, "rb") as f:
-            blob_client.upload_blob(f, overwrite=True)
-            
-    def upload_stream_to_blob(self, file_data, blob_file_path):
+            blob_client.upload_blob(f, overwrite=overwrite)
+
+    def upload_stream_to_blob(self, file_data, blob_file_path, overwrite: bool = True):
         """
         Uploads a file-like object to the specified blob path in the base container.
         """
         blob_client = self.get_blob_client(blob_file_path)
-        blob_client.upload_blob(file_data, overwrite=True)
+        blob_client.upload_blob(file_data, overwrite=overwrite)
         
     def copy_blob_to_path(self, source_blob_client, target_blob_path):
         """
