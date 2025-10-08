@@ -46,6 +46,17 @@ class BlobStorageHelper:
             )
         else:
             raise ValueError("Must provide either sas_url or both conn_str and container.")
+    def list_blobs(self, prefix: str = ""):
+        """
+        List all blobs in the container recursively, optionally filtered by a prefix.
+
+        Args:
+            prefix (str, optional): Path prefix within the blob container. Defaults to "".
+        Returns:
+            List[str]: A list of blob names.
+        """
+        return [blob.name for blob in self.container_client.list_blobs(name_starts_with=prefix)]
+
 
     def list_subdirectories(self, folder: str):
         """
@@ -69,6 +80,25 @@ class BlobStorageHelper:
     def get_blob_client(self, path: str):
         """Return a blob client for the given blob path."""
         return self.container_client.get_blob_client(path)
+
+    def download_blob_to_local(self, blob_path: str, local_file_path: str, binary: bool = True):
+        """
+        Download a blob to a local file.
+
+        Args:
+            blob_path (str): Path of the blob to download.
+            local_file_path (str): Local file path to save the downloaded blob.
+            binary (bool): If True, download the blob as binary. If False, download as text.
+        """
+        blob = self.get_blob_client(blob_path)
+        if blob.exists():
+            with open(local_file_path, "wb" if binary else "w") as file:
+                try:
+                    file.write(blob.download_blob().readall())
+                except Exception as e:
+                    print(f"Error downloading blob: {e}")
+        else:
+            print("Provided blob path doesn't exist.")
 
     def read_data(self, path: str, as_text=False):
         """
@@ -227,6 +257,13 @@ class BlobStorageHelper:
     def upload_stream_to_blob(self, file_data, blob_file_path, overwrite: bool = True):
         """
         Uploads a file-like object to the specified blob path in the base container.
+        Args:
+            file_data: A file-like object (e.g., BytesIO, file handle).
+            blob_file_path (str): The destination path for the blob in the container.
+            overwrite (bool): Whether to overwrite the blob if it already exists. Default is True.
+        Example:
+            with open("local_file.txt", "rb") as f:
+                upload_stream_to_blob(f, "path/in/container/blob.txt")
         """
         blob_client = self.get_blob_client(blob_file_path)
         blob_client.upload_blob(file_data, overwrite=overwrite)
