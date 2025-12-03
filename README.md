@@ -5,7 +5,7 @@ need to add more useful stuff
 
 # Install
 ## pip
-pip install http://git@github.com/chen112p/pyazure.git
+pip install git+https://github.com/chen112p/pyazure.git
 ## uv
 uv add http://git@github.com/chen112p/pyazure.git
 ### add to pyproject.toml
