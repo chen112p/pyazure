@@ -57,22 +57,28 @@ class BlobStorageHelper:
         """
         return [blob.name for blob in self.container_client.list_blobs(name_starts_with=prefix)]
 
-
-    def list_subdirectories(self, folder: str):
+    def list_subdirectories(self, folder: str = "."):
         """
         List subdirectories under the given folder.
-
+        
         Args:
-            folder (str): Path prefix within the blob container.
+            folder (str): Path prefix within the blob container. 
+                        Use "." to list folders at the container root.
 
         Returns:
             List[str]: A list of folder-like blob prefixes (ending in '/').
         """
-        folder = folder if folder.endswith("/") else folder + "/"
+
+        # Interpret "." or empty string as root
+        if folder in (".", "", None):
+            prefix = ""      # no prefix → search from base
+        else:
+            prefix = folder if folder.endswith("/") else folder + "/"
+
         return [
             item.name
             for item in self.container_client.walk_blobs(
-                name_starts_with=folder, delimiter="/"
+                name_starts_with=prefix, delimiter="/"
             )
             if isinstance(item, BlobPrefix)
         ]
